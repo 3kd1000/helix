@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  helix-api:
+    build: ./oracle-server/api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:dev123@postgres:5432/helix
+      - CHROMA_URL=http://chromadb:8000
+      - GIT_REPO_PATH=/git-repo
+      - GIT_SSH_KEY_PATH=/ssh/id_rsa
+    volumes:
+      - ./obsidian-vault:/git-repo  # 로컬 Obsidian Vault 마운트
+      - ~/.ssh:/ssh:ro               # SSH key for git push
+    depends_on:
+      - postgres
+      - chromadb
+    # 개발용: 코드 변경 시 자동 리로드
+    command: poetry run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: helix
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./oracle-server/schemas/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+
+  # (향후 추가 예정)
+  # streamlit:
+  #   build: ./oracle-server/search-ui
+  #   ports:
+  #     - "8501:8501"
+  #   environment:
+  #     - FASTAPI_URL=http://helix-api:8000
+  #   depends_on:
+  #     - helix-api
+
+volumes:
+  postgres_data:
+  chroma_data:
