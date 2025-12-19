@@ -1,52 +1,56 @@
 #!/usr/bin/env python3
-"""Helix 저장 스크립트 - Slash Command에서 직접 실행"""
+"""Helix 저장 스크립트 - Slash Command에서 직접 실행 (테스트용)"""
 
 import sys
 import json
-import os
-import requests
+import argparse
+from datetime import datetime
+from pathlib import Path
 
-def save_to_helix(summary: str, primary_tag: str, tags: list[str], conversation: str):
-    """대화를 Helix에 저장"""
+def save_to_helix(summary: str, primary_tag: str, tags: list[str], conversation: str, mode: str = "simple"):
+    """대화를 Helix에 저장 (테스트: 파일로 저장)"""
 
-    # 환경변수에서 설정 읽기
-    webhook_url = os.getenv('HELIX_WEBHOOK_URL', 'http://localhost:8000/webhook/save')
-    token = os.getenv('HELIX_TOKEN')
+    print("=" * 80)
+    print("📝 Helix 저장 테스트")
+    print("=" * 80)
+    print()
+    print(f"📌 Summary: {summary}")
+    print(f"🏷️  Primary Tag: {primary_tag}")
+    print(f"🔖 Tags: {', '.join(tags)}")
+    print(f"📁 Mode: {mode}")
+    print()
 
-    if not token and webhook_url != 'http://localhost:8000/webhook/save':
-        print("ERROR: HELIX_TOKEN 환경변수가 설정되지 않았습니다.")
-        sys.exit(1)
+    # temp 디렉토리 생성
+    temp_dir = Path.home() / "study" / "helix" / "temp"
+    temp_dir.mkdir(parents=True, exist_ok=True)
 
-    # Webhook 호출
-    headers = {}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    # 파일명 생성: helix_simple_2025-12-18_123456.md
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    filename = f"helix_{mode}_{timestamp}.md"
+    filepath = temp_dir / filename
 
-    response = requests.post(
-        webhook_url,
-        json={
-            "summary": summary,
-            "primary_tag": primary_tag,
-            "tags": tags,
-            "conversation": conversation
-        },
-        headers=headers
-    )
+    # 파일 저장
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(conversation)
 
-    if response.status_code == 200:
-        print("✅ Helix에 저장 완료!")
-        result = response.json()
-        print(f"📄 생성된 문서: {result.get('filename', 'N/A')}")
-        related_docs = result.get('related_docs', [])
-        print(f"🔗 연관 문서: {len(related_docs)}개")
-        for i, doc in enumerate(related_docs[:3], 1):
-            print(f"   {i}. {doc.get('title', 'N/A')} (유사도: {doc.get('score', 0):.2f})")
-    else:
-        print(f"❌ 저장 실패: {response.status_code}")
-        print(response.text)
-        sys.exit(1)
+    print(f"💾 저장 완료: {filepath}")
+    print()
+    print("💬 Conversation Preview:")
+    print("-" * 80)
+    # 처음 500자만 미리보기
+    preview = conversation[:500] + "..." if len(conversation) > 500 else conversation
+    print(preview)
+    print("-" * 80)
+    print()
+    print(f"✅ 테스트 완료! 파일 저장됨: {filepath}")
+    print("=" * 80)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Helix 대화 저장")
+    parser.add_argument("--mode", choices=["simple", "detailed"], default="simple",
+                        help="저장 모드: simple 또는 detailed")
+    args = parser.parse_args()
+
     # stdin에서 JSON 읽기
     try:
         data = json.loads(sys.stdin.read())
@@ -54,7 +58,8 @@ if __name__ == "__main__":
             summary=data['summary'],
             primary_tag=data['primary_tag'],
             tags=data['tags'],
-            conversation=data['conversation']
+            conversation=data['conversation'],
+            mode=args.mode
         )
     except json.JSONDecodeError:
         print("ERROR: 올바른 JSON 형식이 아닙니다.")
